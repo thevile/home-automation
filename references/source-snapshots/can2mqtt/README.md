@@ -1,0 +1,281 @@
+# can2mqtt
+A Linux or Windows service to forward CAN frames to MQTT messages
+The precompiled version you can find in the releases section may not be the latest version described below. Check the version number for differences. To get the very latest version, build from code.
+
+# Latest Updates
+
+## V5.0
+
+Breaking changes:
+ - Running on .NET 10.0 instead of .NET 6.0
+
+New features:
+ - Added option `ConvertUnknown`, this defines if values of an unknown typed message (e.g., no entry in StiebelEltron.json) shall be converted with all possible formats and printed to console.
+ - Added fallback value converter for unknown indexes in StiebelEltron.json for easier debugging.
+ - Added automatic polling feature. It can be enabled using config option `AutoPolling`. The polling interval **in seconds** can be defined with `AutoPollingInterval`. To avoid connection loss to socketcand `AutoPollingThrottle` needs to be specified **in milliseconds**. This delay will be introduced between each sent read. If a value shall not be polled, add `"IgnorePolling": true` to `StiebelEltron.json`.
+ - Added combined values feature that allows combining two elster indices together. See documentation below.
+
+
+Fixes:
+ - Do not publish unknown values to MQTT broker
+ - Load StiebelEltron.json only once during runtime
+
+## V4.4
+This software was just updated. The main and breaking changes are:
+- Running on .NET 6.0 instead of Dotnet Core 2.2
+- Using SOCKETCAND instead of CANLOGSERVER
+- MQTT Topics changed
+- Supporting MQTT Sends
+- Supporting authentication on MQTT broker
+- Moved config to json file instead of parameters
+
+# Tested/verified Models by creator and community:
+Stiebel Eltron LWZ 504 / LWZ 8 CS Premium
+Stiebel Eltron WPF 10E
+
+# HowTo
+Note: This whole readme assumes the following environment:
+- You are running and Ubuntu based Linux distribution on a Raspberry Pi (Tested with Raspberry Pi OS and openHABian)
+- You are using the user "Pi" (if you have something else, just replace the username wherever stated)
+- You are using a fresh installation of the OS
+- You are using a USBtin device to connect to the CAN Bus (others might work but are not tested by me)
+- In thoery (and also during development I did this), socketcand and canutils can run the Raspberry Pi while can2mqtt is running on a another device in the network. That way you can also use a Raspberry Pi Zero (1st Gen) for socketcand and can-utils while running can2mqtt on another system that supports the Dotnet Framework (requires ARMv7 or later architecture).
+
+
+# Installation and Setup
+## Install .NET 10.0 Runtime
+The latest resources to install .Net is documented here: https://learn.microsoft.com/en-us/dotnet/core/install/linux-debian?tabs=dotnet10
+
+### For Debian 13 (Trixie) this is
+```
+wget https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
+sudo apt update
+sudo apt install -y dotnet-runtime-10.0
+```
+
+
+Check the setup by run "dotnet --info". It should return the installed version and some other details.
+
+## can-utils installation and setup
+### Install can-utils
+```
+sudo apt-get install git
+sudo mkdir /opt
+cd /opt
+git clone https://github.com/linux-can/can-utils.git
+cd can-utils
+make
+```
+
+### Setup the CAN Bus connection 
+Assuming your device has the ID ttyACM0:
+```
+sudo /opt/can-utils/slcan_attach -f -s1 -b 11 -o /dev/ttyACM0
+sudo /opt/can-utils/slcand ttyACM0 slcan0
+sudo ifconfig slcan0 up
+```
+
+To add this to autostart and setup the adapter on every reboot, run 'sudo nano /etc/rc.local'
+Paste the three lines above at the end before the "EXIT 0".
+
+## socketcand installation and setup
+### Install socketcand
+```
+sudo apt-get install git libconfig-dev autoconf libsocketcan-dev
+cd ~
+git clone https://github.com/linux-can/socketcand.git
+cd socketcand
+meson setup -Dlibconfig=true --buildtype=release build
+meson compile -C build
+sudo meson install -C build
+```
+
+### Start socketcand
+This is only required to test and debug or if you like to take care of socketcand on your own.
+You need to replace eth0 if your network interface is called different than eth0.
+```
+ /usr/local/sbin/socketcand -i slcan0 -l eth0 -v
+```
+
+### Setup socketcand as daemon
+Execute 'sudo nano /etc/systemd/system/socketcand.service', replace the network interface name if it is not eth0, replace the user with a username the daemon will use to run and paste the following:
+```
+[Unit]
+Description=socketcand
+After=network.target
+
+[Service]
+ExecStart=/usr/local/sbin/socketcand -i slcan0 -l eth0 -v
+WorkingDirectory=/usr/local/sbin/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Finally run the following commands:
+```
+sudo systemctl enable socketcand
+sudo systemctl start socketcand
+```
+
+## MQTT Broker
+You need an MQTT Broker, that is handling the MQTT traffic. You need to define the MQTT Broker IP in the can2mqtt config file later.
+If you don't have any MQTT broker, Mosquitto is a common MQTT Broker. Please check out on yourself how to install and configure it.
+
+## can2mqtt
+### Download can2mqtt
+```
+cd ~
+wget https://github.com/Hunv/can2mqtt/releases/download/v5/can2mqtt_v5.zip -O can2mqtt.zip
+sudo unzip can2mqtt.zip -d /opt/can2mqtt
+```
+
+### Start can2mqtt: 
+Optional: This is only required to test and debug or if you like to take care of can2mqtt on your own by running can2mqtt interactivly. 
+You can also configure a daemon to do this automatically (see below).
+```
+dotnet /opt/can2mqtt/can2mqtt.dll
+```
+
+### Setup can2mqtt as daemon
+Execute 'sudo nano /etc/systemd/system/can2mqtt.service', replace the user with a username the daemon will use to run and paste the following:
+```
+[Unit]
+Description=can2mqtt
+After=network.target
+
+[Service]
+ExecStart=dotnet /opt/can2mqtt/can2mqtt.dll
+WorkingDirectory=/opt/can2mqtt/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Configure config.json:
+First copy the sample config.json file: 'sudo cp /opt/can2mqtt/config-sample.json /opt/can2mqtt/config.json'
+Edit the config.json with your favorite editor (i.e. nano): 'sudo nano /opt/can2mqtt/config.json'
+```
+{
+  "CanServer": "192.168.0.10",      < This is the System where socketcand is running on
+  "CanServerPort": 29536,           < This is the port socketcand is using (29536 is default)
+  "CanForwardWrite": true,          < This defines if can2mqtt will handle CAN bus packages, that have the "write" flag
+  "CanForwardRead": true,           < This defines if can2mqtt will handle CAN bus packages, that have the "read" flag
+  "CanForwardResponse": true,       < This defines if can2mqtt will handle CAN bus packages, that have the "response" flag
+  "CanReceiveBufferSize": 48,       < The buffer size of receiving commands. 48 is default.
+  "CanSenderId":"6A2",              < The ID can2mqtt will use at the CAN bus in case of writing to the CAN bus
+  "CanInterfaceName":"slcan0",      < The Interface name to use for the CAN bus connection
+
+  "MqttServer": "192.168.0.10",     < This is the IP of the MQTT Broker
+  "MqttClientId": "Can2Mqtt",       < This is the ID the MQTT Client will use when register at MQTT Broker
+  "MqttTopic": "Heating",           < This is the first path item of the MQTT topic path can2mqtt will use for send/receive information
+  "MqttTranslator": "StiebelEltron",< This is the translator used to translate the CAN bus data to values and send it via MQTT
+  "MqttUser": "",                   < This is the user that is required to register at the MQTT broker. Leave empty for none.
+  "MqttPassword": "",               < This is the password that is required to register at the MQTT broker. Leave empty for none.
+  "MqttAcceptSet": false,           < This is a setting, that defines if can2mqtt will send write-commands to the CAN bus. For safety reasons the default setting is set to false.  
+
+  "NoUnits": true,                  < This defines if sending MQTT messages will contain the unit defined in the translator config or not (i.e. "25°C" or just "25")  
+  "Language": "en",                 < This defines the language, that will be used. Currently available languages are "en" (English) and "de" (German).
+
+  "ConvertUnknown": false           < New in Release 5.0; This defines if values of an unknown typed message (e.g., no entry in StiebelEltron.json) shall be converted with all possible formats and printed to console.
+  "AutoPolling": false,             < New in Release 5.0: This defines if values shall be polled automatically.
+  "AutoPollingInterval": 30         < New in Release 5.0: If AutoPolling is enabled, this value defines the interval in which values are polled in seconds. e.g. 30s.
+  "AutoPollingThrottle": 150        < New in Release 5.0: Throttle time between each sent read request in milliseconds. Adapt in case connection to socketcand is lost when auto polling is enabled.
+}
+```
+
+Finally run the following commands to start the daemon:
+```
+sudo systemctl enable can2mqtt
+sudo systemctl start can2mqtt
+```
+
+# MQTT Data format
+can2mqtt sends the data in the topics, that are defined in the config of the translator. In case of the Stiebel Eltron translator it is the 'StiebelEltron.json'. There will be a prefix-topic in case there are other instances of can2mqtt or other MQTT applications. This one is configured in the config.json at the setting 'MqttTopic'.
+An example MQTT message may look like this:
+Topic: heating/outside/temperature/measured
+Value: 21°C
+
+If you like to set data, add a /set at the end of the topic.
+An example MQTT message to can2mqtt to set the desired room temperature of the primary heat cycle to 23°C:
+Topic: heating/room/hc1/temperature/day/set
+Value: 23 (Important: Without the unit!)
+
+If you need to request a send from the CAN bus, you can add a /read at the end of the topic.
+An example MQTT message to can2mqtt to request the value of the desired room temperature of the primary heat cycle:
+Topic: heating/room/hc1/temperature/day/read
+
+# Stiebel Eltron Elster Table
+
+The following section describes the format of `can2mqtt_core/can2mqtt_core/translator/stiebel_eltron/StiebelEltron.json`.
+
+## Ignore from auto polling
+If a value shall not be polled, add `"IgnorePolling": true` entry.
+
+## Combined Values
+In case you want to combine the following two entries (the example was stripped and only relevant fields are kept):
+```json
+  {
+    "Index": "092E",
+    "Sender": "180",
+    "Unit": "Wh",
+    "Converter": "Default",
+    "Name": {
+      "EN": "Heat Meter Heating Day",
+      "DE": "Wärmemenge Heizen Tag"
+    },
+    "MqttTopic": "/meter/heating/day/Wh",
+  },
+  {
+    "Index": "092F",
+    "Sender": "180",
+    "Unit": "KWh",
+    "Converter": "Default",
+    "Name": {
+      "EN": "Heat Meter Heating Day",
+      "DE": "Wärmemenge Heizen Tag"
+    },
+    "MqttTopic": "/meter/heating/day/KWh",
+  },
+```
+
+You can do it by removing one of the entries and adapt the other like this:
+
+```json
+  {
+    "Index": "092F",
+    "CombineIndex": "092E",
+    "Sender": "180",
+    "Unit": "KWh",
+    "Converter": "Default",
+    "Name": {
+      "EN": "Heat Meter Heating Day",
+      "DE": "Wärmemenge Heizen Tag"
+    },
+    "MqttTopic": "/meter/heating/day/KWh",
+  },
+```
+
+Possible converters:
+
+Assume the following values for the given examples: `Index` = 19 and `CombineIndex`= 234
+
+| Converter | Formula                             | Example                     |
+|-----------|-------------------------------------|-----------------------------|
+| `Default` | `Index`* 1000 + `CombineIndex`      | 19 * 1000 + 234 = 19234     |
+| `Dec`     | `Index` + (`CombineIndex` / 1000)   | 19 + 234 / 1000 = 19,234    |
+
+
+# Troubleshooting
+## Issue: The connection is reconnecting over and over again multiple times within seconds until the application crashes
+Reason: Do you have a second MQTT client registered on the MQTT Broker with the same client ID?

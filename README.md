@@ -1,135 +1,30 @@
-This is a config for an esphome device, together with an MCP2515 can bus component.
-Descriptions how to build up the module and further discussions can be found in my thread in the home assistant forum:
-https://community.home-assistant.io/t/configured-my-esphome-with-mcp2515-can-bus-for-stiebel-eltron-heating-pump/366053/16
+This is an ESPHome configuration for an MCP2515 CAN-bus interface to a Stiebel
+Eltron heat pump. Build and wiring background is in the original Home Assistant
+[forum discussion](https://community.home-assistant.io/t/configured-my-esphome-with-mcp2515-can-bus-for-stiebel-eltron-heating-pump/366053/16).
 
-Eventually you have to change the CAN-id of the esphome device, if you get no response from the bus.
-Some users reported that the CAN-id 680 didn't work for them.
-Also some users reported from different baud-rates.
-Change them in the section, where you configure the canbus + change the gloabal variable internalResponse_id respectively.
-You will further have to change all values that correspond to 0x680 and the can-id 680
+## Configuration notes
 
+If the heat pump does not respond, its CAN ID, this ESP's `0x680` identity, or
+the 20 kbps bus rate may differ. Keep `internalResponse_id` and the `canbus`
+CAN ID in sync. The WPM's read/write address bytes are configured as
+`PumpCANread_id` and `PumpCANwrite_id`; the FEK read address is
+`FekCANread_id`.
 
-For the address of the heat pump, change the variables PumpCANread_id and PumpCANwrite_id.
-For the address of the FEK, change the variable FekCANread_id
+## Domestic hot water automation
 
-#
-To change the comfort-temperature and eco-temperature of your heat-pump via home-assistant, add the following sensors to your homeassistant config.yaml:
+The existing `input_text.ww_komfort_temp` and `input_text.ww_eco_temp` helpers
+expect tenths of a degree Celsius: `550` means 55.0 °C. Their accepted range is
+250–600. They remain compatible with the original PV automation.
 
-input_text:
+## Safe heating controls
 
-  ww_komfort_temp:
-    name: Warmwassertemperatur Komfort 1/10°C
-    min: 3
-    max: 3
-    pattern: "[0-9]*"
+This configuration no longer exposes a generic Home Assistant service or
+button for arbitrary CAN frames. Writable parameters are explicitly
+limited to named settings. Heating Comfort, Eco, and curve slope retain their
+read-only sensors and now have separate guarded number controls with read-back
+status. Readings refresh from manager 0x480 every 30 seconds. External heating
+writes are ready for manual testing but have not yet been verified on hardware.
 
-  ww_eco_temp:
-    name: Warmwassertemperatur Eco 1/10°C
-    min: 3
-    max: 3
-    pattern: "[0-9]*"
-
-
-#
-Insert a value in 1/10 degrees Celsius in the home-assistant input_text fields.
-e.g. to set the comfort-temperature of your heat-pump to 55°C, set the value to 550
-Changing a value in the input_text will directly generate a change of the value on your heat-pump.
-You can verify it on your heat-pump's display.
-My esphome-config has a filter included that only accepts values that are > 250 and < 600.
-
-You can e.g. use this to change the comfort-temperature when there is enough energy-production from your photovoltaic module. You can leave the eco-temperature constantly low for generating no warm water at night, when there is no sunlight.
-
-
-#
-#
-To send individual CAN-messages from Homeassistant there is an implementation in my code, where you have to add some sensors and a script in Home-Assistant.
-This is more likely for experimental use, but it can help to find useful messages from your heatpump (as they sometimes vary from one device to the other).
-Be aware, that you can also change values on your heatpump with this function!
-Howto:
-
-
-#
-Add the following sensors to your homeassistant config.yaml, to create input-textfields:
-
-
-input_text:
-
-  h_addr:
-    name: h_addr
-    initial: "3100"
-    min: 4
-    max: 4
-    pattern: "[a-fA-F0-9]*"
-  h_idx:
-    name: h_idx
-    initial: "0000"
-    min: 4
-    max: 4
-    pattern: "[a-fA-F0-9]*"
-  h_val:
-    name: h_val
-    initial: "0000"
-    min: 4
-    max: 4
-    pattern: "[a-fA-F0-9]*"
-
-#
-Add the following script to you homeassistant scripts.yaml-file.
-The script reads the values from the input-text, converts the values into integer-values and forwards them to the ESPhome sensor.
-This is to prepare the can-message for forwarding it to the CAN-bus. The script itself does not forward a value to the bus.
-It is just generating the message in integer. The sending-part is initiated using the buttons on the esphome-device.
-
-
-sequence:
-  - service: esphome.<your_esphome_device_name>
-    data:
-      idx: "{{ states(\"input_text.h_idx\")|int(base=16) }}"
-      addr: "{{ states(\"input_text.h_addr\")|int(base=16) }}"
-      val: "{{ states(\"input_text.h_val\")|int(base=16) }}"
-mode: queued
-icon: mdi:play
-max: 5
-alias: send CAN-message to ESP-home
-
-#
-Create a button for the script in your Lovelace interface
-
-#
-To send an individual CAN-message, insert the hex-values for address in h_addr.
-e.g. 3100 to receive a value or 3000 to change a value on your heat-pump with address 0x180. Change the address to your individual need.
-
-Insert the Elster-index of interest in h_idx. e.g. (000c for outside-temperature)
-
-Insert a value in h_val (if you want to change a value) or leave it as 0000 if you just want to receive a current value.
-Press the button "send CAN-message to ESP-home
-
-Two other buttons are created automatically within home assistant:
-"Befehl anzeigen / Sensorupdate"
-This is a button is created by the ESP-home device. If you followed my ESP-yaml, this button has the id “can_befehl_anzeigen”.
-You may have to let it show up in the home assistant lovely interface.
-
-- Stored CAN-messages are sent to update various sensors.
-- The message that was manually set in home assistant is showed in the log-output of the ESP-device
-- The manually set CAN-message will not be transmitted to the CAN-network
-
-"CAN-Befehl absetzen"
-This is a button created by the ESP-home device. If you followed my ESP-yaml, this button has the id “can_send”
-You may have to let it show up in the home assistant lovely interface.
-
-- The CAN-message that was set in home-assistant (after pushing button "send CAN-message to ESP-home") will be sent to the CAN-network.
-
-Press the button "Befehl anzeigen / Sensorupdate" that is provided by the esphome-device, to show up the CAN-message in the log.
-Press the button "CAN-Befehl absetzen" that is provided by the esphome-device, to send the CAN-message to the bus.
-If you did everything correctly, the esphome-log will show an answer to your CAN-request after pressing "send CAN-message to ESP-home" and then pressing "CAN-Befehl absetzen".
-
-Other noteworthy addresses and their hex-values for the CAN-message
-
-- CAN ID 180: read - 3100, write - 3000
-- CAN ID 301: read - 0c01, FEK-device (no active can request, only listening)
-
-other addresses
-- 180 read: 3100  write: 3000
-- 301	read: 6101  write: 6001
--	480	read: 9100  write: 9000    WMPme Wärmepumpenmanager
--	601	read: C101  write: C001
--	680	confirmation: D200
+See [WPF10_HEATING_CONTROLS.md](WPF10_HEATING_CONTROLS.md) for the verified
+WPF 10 mapping, safety behaviour, reference snapshots, and parameters still
+awaiting model-specific verification.
