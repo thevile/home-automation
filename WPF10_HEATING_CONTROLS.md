@@ -1,5 +1,26 @@
 # WPF 10 heating controls
 
+## Current mode dropdown (supersedes read-only mode notes below)
+
+Heating operating mode setting exposes Emergency (0000), Standby (0100),
+Automatic (0200), Comfort (0300), Eco (0400), and Hot water only (0500).
+Comfort/Eco were verified by panel changes; the other four mappings are from
+the reference enum and remain unverified on this unit. The user explicitly
+requested exposing those reference values for writing.
+
+The dropdown uses the shared single-write script at manager 0x480/index 0112,
+encodes mode in the high byte, requires a known mode read within 90 seconds,
+and accepts only integers 0–5. State is published only from controller replies.
+The existing Heating write status reports read-back match, mismatch or timeout.
+There is no automatic mode write on boot, retry, or restoration. Unknown modes
+remain visible in the text sensor and block subsequent mode writes until a
+known mode is read. The dropdown may retain its previous label in that case.
+
+External mode write acceptance remains untested. Test Comfort/Eco first and
+confirm the panel. Emergency selects emergency/backup operation; Standby and
+Hot water only can suspend normal space heating, so these are not ordinary
+price-control modes.
+
 ## Operating-mode read verification
 
 The panel test in `mode-test.log` confirmed `PROGRAMMSCHALTER` at manager

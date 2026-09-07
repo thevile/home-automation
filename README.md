@@ -18,6 +18,12 @@ expect tenths of a degree Celsius: `550` means 55.0 °C. Their accepted range is
 
 ## Safe heating controls
 
+**Heating operating mode setting** is a writable dropdown for Emergency,
+Standby, Automatic, Comfort, Eco, and Hot water only. It shares the temperature
+controls' write lock, recent-read requirement, and read-back status. Comfort/Eco
+read mappings are panel-confirmed; other mode labels come from the reference
+table, and mode writes still need hardware testing. Start with Comfort/Eco.
+
 This configuration no longer exposes a generic Home Assistant service or
 button for arbitrary CAN frames. Writable parameters are explicitly
 limited to named settings. Heating Comfort, Eco, and curve slope retain their
