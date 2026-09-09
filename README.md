@@ -45,3 +45,33 @@ writes are ready for manual testing but have not yet been verified on hardware.
 See [WPF10_HEATING_CONTROLS.md](WPF10_HEATING_CONTROLS.md) for the verified
 WPF 10 mapping, safety behaviour, reference snapshots, and parameters still
 awaiting model-specific verification.
+
+## Telemetry fixes
+
+Hot water temperature and Storage ACTUAL temperature now publish the same
+controller reading (`0x000e`), accepting short and extended replies. The former
+hot water handler expected the wrong framing and added an undocumented 3.9 °C
+offset from the original installation; that offset is removed.
+
+Daily energy counters and Compressor starts publish as soon as both counter
+parts arrive, including valid zero values. Previously, publication waited for
+the next polling cycle; compressor counts also required both parts to be
+positive. Daily energy polling is every 15 minutes, including heating
+consumption (previously six hours). These sensors are requested on boot and
+by the Sensor update button. Partial pairs are cleared before a new poll.
+
+The daily energy indices match the vendored Elster table (`0x091a/b`,
+`0x091e/f`, `0x092a/b`, `0x092e/f`). Compressor indices `0x071c/d` are retained
+from the original configuration. Although the reference table calls them test
+objects, the live controller returned a combined count of 71,744 after upload
+on 2026-09-09 (not yet compared with the physical panel). All six previously
+missing readings appeared in Home Assistant: hot water 45.4 °C; daily hot water
+consumption/production 2.458/4.931 kWh; daily heating consumption/production
+2.140/10.530 kWh; and compressor starts 71,744. Logs confirmed the expected
+firmware build. These observations verify reception and publication, not the
+physical accuracy of the counters.
+
+Run `python3 tests/test_can_replies.py` to exercise the actual C++ reply handlers
+with short/extended temperature frames, reversed counter reply order, zero
+counts, incomplete pairs, invalid values, and malformed/address-mismatched
+frames. Run `esphome compile sensor_node.conf` to build the firmware.
