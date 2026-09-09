@@ -10,11 +10,22 @@ CAN ID in sync. The WPM's read/write address bytes are configured as
 `PumpCANread_id` and `PumpCANwrite_id`; the FEK read address is
 `FekCANread_id`.
 
-## Domestic hot water automation
+## Domestic hot water controls
 
-The existing `input_text.ww_komfort_temp` and `input_text.ww_eco_temp` helpers
-expect tenths of a degree Celsius: `550` means 55.0 °C. Their accepted range is
-250–600. They remain compatible with the original PV automation.
+**Hot water comfort setpoint** and **Hot water eco setpoint** expose numeric
+controls in Home Assistant, matching the heating controls: 25–60 °C in 0.1 °C
+steps, with controller-confirmed state. They refresh every 30 seconds and share
+the heating controls' write lock and 90-second recent-reading requirement.
+**Hot water write status** reports read-back match, mismatch, or timeout.
+These use the existing hot water addresses (Comfort `0x0013`, Eco `0x0a06`
+at `0x180`), with no automatic number writes on boot or restoration.
+The new controls compile but still need verification on the heat pump after upload.
+
+The legacy PV automation example and its input-text helper listeners have been
+removed. Future Nord Pool spot-price automation can use these numeric controls
+in degrees Celsius. No price-based automation is configured yet. The shared
+write script handles one setting at a time; allow at least six seconds between
+setting changes and check the write status.
 
 ## Safe heating controls
 

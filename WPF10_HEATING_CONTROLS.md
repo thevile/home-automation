@@ -1,5 +1,13 @@
 # WPF 10 heating controls
 
+## Hot water controls and legacy automation cleanup
+
+Hot water Comfort and Eco now have guarded numeric controls; see README.md
+for their ranges and read-back behavior. The legacy PV automation example and
+both hot water input-text helper listeners have been removed. References below
+to retained domestic hot water automation describe earlier firmware only.
+Future Nord Pool price automation is not implemented yet.
+
 ## Current mode dropdown (supersedes read-only mode notes below)
 
 Heating operating mode setting exposes Emergency (0000), Standby (0100),
