@@ -1,0 +1,29 @@
+# Nord Pool Finland spot price, migrated from the Home Assistant UI entry.
+#
+# UI config entry recovered from HA on 2026-09-12:
+#   region: FI
+#   currency: EUR
+#   VAT: enabled (the resulting Finnish rate is encoded in the entity ID)
+#   precision: 3
+#   low-price cutoff: 1.0 (below the daily average)
+#   additional cost: 0.07728 EUR/kWh (superseded below)
+#
+# Current price components, all in EUR/kWh:
+#   distribution, 07:00-22:00: 0.0432 (VAT included)
+#   distribution, 22:00-07:00: 0.0146 (VAT included)
+#   electricity tax class I: 0.02325 before 25.5% VAT
+#   electricity retailer margin: 0.00430 (VAT included)
+sensor:
+  - platform: nordpool
+    region: FI
+    currency: EUR
+    VAT: true
+    precision: 3
+    low_price_cutoff: 1.0
+    price_in_cents: false
+    price_type: kWh
+    additional_costs: >
+      {% set distribution = 0.0432 if 7 <= now().hour < 22 else 0.0146 %}
+      {% set electricity_tax = 0.02325 * 1.255 %}
+      {% set retailer_margin = 0.00430 %}
+      {{ distribution + electricity_tax + retailer_margin }}

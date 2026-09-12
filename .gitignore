@@ -6,3 +6,10 @@
 
 # Local Home Assistant credentials
 /.local/
+
+# Home Assistant runtime data, secrets, and backups
+/home-assistant/secrets.yaml
+/home-assistant/.storage/
+/home-assistant/home-assistant_v2.db*
+/home-assistant/*.log*
+/home-assistant/backups/

@@ -75,3 +75,10 @@ Run `python3 tests/test_can_replies.py` to exercise the actual C++ reply handler
 with short/extended temperature frames, reversed counter reply order, zero
 counts, incomplete pairs, invalid values, and malformed/address-mismatched
 frames. Run `esphome compile sensor_node.conf` to build the firmware.
+
+## Home Assistant energy optimization
+
+Version-controlled Home Assistant configuration is under `home-assistant/`.
+The staged plan for coordinating Nord Pool pricing, heat-pump heating,
+domestic hot water, and Tesla charging is in
+[ENERGY_OPTIMIZATION_PLAN.md](ENERGY_OPTIMIZATION_PLAN.md).
