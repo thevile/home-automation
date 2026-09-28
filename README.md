@@ -82,3 +82,10 @@ Version-controlled Home Assistant configuration is under `home-assistant/`.
 The staged plan for coordinating Nord Pool pricing, heat-pump heating,
 domestic hot water, and Tesla charging is in
 [ENERGY_OPTIMIZATION_PLAN.md](ENERGY_OPTIMIZATION_PLAN.md).
+
+The read-only shadow scheduler now runs as a local HA app and publishes
+`sensor.energy_shadow_raw`. Its separate **Energy shadow** dashboard shows
+recommendations, calibration status, deadlines, and source limitations. The
+[implementation plan](SHADOW_SCHEDULER_PLAN.md) describes its assumptions and
+observation gate. The app source is under `scripts/energy_scheduler/`, with
+non-secret settings in `home-assistant/energy_scheduler/settings.json`.

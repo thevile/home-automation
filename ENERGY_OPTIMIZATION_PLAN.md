@@ -20,8 +20,9 @@ electricity tax, and time-dependent distribution tariff.
 - [x] Verify all 96 quarter-hour prices and both tariff transitions in HA.
 - [x] Fix the Default dashboard units and incomplete-tomorrow behavior.
 - [x] Establish SSH deployment access to `homeassistant.local`.
-- [ ] Add the official Tesla Fleet integration.
-- [ ] Implement and observe a read-only shadow scheduler.
+- [x] Add the official Tesla Fleet integration and inventory its entities.
+- [x] Deploy a read-only shared shadow scheduler and HA recommendation view.
+- [ ] Complete seven-day shadow observation and review.
 - [ ] Enable Tesla charging control.
 - [ ] Enable domestic-hot-water control.
 - [ ] Enable conservative space-heating control.
@@ -42,16 +43,22 @@ electricity tax, and time-dependent distribution tariff.
 - Normal departure deadline: 07:00.
 - Guaranteed minimum state of charge at departure: 40%.
 - Use the vehicle's configured charge limit as the normal target initially.
-- Tesla is not yet integrated with Home Assistant.
+- Tesla Fleet is integrated with Home Assistant as `Kurre`.
+- Current integration values: 43% state of charge, 80% charge limit, and a
+  configured charging-current ceiling of 16 A.
+- The present charger is single-phase. Live control was verified at 9 A: HA
+  changed the current, started charging at about 2 kW on phase 2, and stopped
+  charging successfully.
 
 ### Space heating
 
 - Heat distribution uses radiators.
-- Minimum acceptable representative room temperature: 19 °C.
+- The 19 °C floor is an optional room-sensor guard when a suitable sensor is
+  confirmed and fresh. Without one, the scheduler cannot verify room comfort.
 - `sensor.h5102_1e0a_temperature` is in an independently heated office. Never
   use it for heat-pump optimization or its temperature safety override.
 - The location and suitability of `sensor.h5102_bfe2_temperature` as the
-  representative heat-pump-heated room sensor needs confirmation.
+  optional representative heat-pump-heated room sensor needs confirmation.
 
 ### Domestic hot water
 
@@ -100,6 +107,20 @@ Relevant feedback:
 - `sensor.stiebel_eltron_can_cop_heating`
 - `sensor.stiebel_eltron_can_cop_hot_water`
 
+Tesla controls and feedback:
+
+- `device_tracker.kurre_location`
+- `binary_sensor.kurre_charge_cable`
+- `sensor.kurre_battery_level`
+- `sensor.kurre_charging`
+- `sensor.kurre_charger_current`
+- `sensor.kurre_charger_power`
+- `sensor.kurre_charge_energy_added`
+- `sensor.kurre_time_to_full_charge`
+- `number.kurre_charge_current`
+- `number.kurre_charge_limit`
+- `switch.kurre_charge`
+
 ## Shared scheduler
 
 The optimizer operates on 15-minute intervals and builds a rolling schedule
@@ -111,7 +132,8 @@ select the same intervals, overload a phase, and create a new demand peak.
 
 Priority during a capacity conflict:
 
-1. Maintain the 19 °C room-temperature safety floor.
+1. Honor the 19 °C floor when measured by a trusted room sensor; otherwise
+   preserve baseline heating rather than inferring that comfort is safe.
 2. Meet a near-term hot-water deadline.
 3. Guarantee at least 40% Tesla charge by 07:00.
 4. Charge the Tesla toward its normal target.
@@ -152,7 +174,7 @@ Initial limits for a future three-phase charger:
 - Confirm controller read-back after every setting change.
 - Preserve the heat pump's built-in hygiene/legionella schedule.
 - A near-term 18:00 deadline takes priority over discretionary Tesla charging,
-  subject to room-temperature and fuse safety.
+  subject to electrical limits and any available room-temperature guard.
 
 The observation phase must determine tank heating time and whether raising the
 active Eco setpoint reliably starts a heating cycle.
@@ -163,32 +185,42 @@ Radiators offer less useful thermal storage than underfloor heating, so begin
 conservatively.
 
 - Do not change the heating-curve slope during the initial rollout.
-- Initially limit setpoint changes to about 0.5-1.0 °C.
-- Preheat during selected cheap periods and use Eco during expensive periods.
-- Override optimization if the representative heated-room sensor approaches
-  19 °C.
+- Initially propose only a small +0.5 °C heating-target trial in a cheap
+  two-hour window, then return to the established baseline. This is a trial,
+  not a demonstrated saving; price-based reductions need comfort evidence.
+- The planner may rank heating windows without a room sensor. If a confirmed,
+  fresh representative sensor is at or below 19.5 °C, keep normal heating
+  instead. An unavailable sensor does not imply that the room is above 19 °C.
 - Use a minimum mode or setpoint hold time of about two hours.
 - Avoid aggressive shifting during cold weather or when recovery would require
   inefficient high water temperatures.
-- Monitor compressor starts, room-temperature deviation, COP, and energy use.
+- Monitor compressor starts, COP, energy use, and room temperature when
+  available. Without room feedback, comfort cannot be guaranteed from HA.
 - Never use the independently heated office sensor for these decisions.
 
 ## Rollout
 
 ### Phase 1: Tesla integration
 
-- [ ] Configure official Tesla Fleet with Vehicle Information, Vehicle
+- [x] Configure official Tesla Fleet with Vehicle Information, Vehicle
       Location, and Vehicle Commands scopes.
-- [ ] Register the virtual key with the Model Y.
-- [ ] Confirm battery, cable, charging, current, limit, and charge-switch
+- [x] Verify the virtual key by successfully issuing a charging command while
+      the vehicle is connected.
+- [x] Confirm battery, cable, charging, current, limit, and charge-switch
       entities.
-- [ ] Confirm the present charger's minimum and maximum current.
+- [x] Confirm the present charger is single-phase and verify control at the
+      current 9 A setting (about 2 kW on phase 2).
+- [ ] Confirm the present charger's real minimum current if dynamic current
+      reduction below 9 A is enabled later. HA reports a 16 A maximum; the
+      entity's nominal 0 A minimum is not proof of the charger's lowest stable
+      charging current.
 
 ### Phase 2: Shadow scheduler
 
-- [ ] Calculate proposed allocations without issuing commands.
-- [ ] Show selected intervals, reasons, deadlines, expected energy, and cost.
-- [ ] Report incomplete forecasts and fallback decisions explicitly.
+- [x] Write the [shadow scheduler implementation plan](SHADOW_SCHEDULER_PLAN.md).
+- [x] Calculate proposed allocations without issuing commands.
+- [x] Show selected intervals, reasons, deadlines, expected energy, and cost.
+- [x] Report incomplete forecasts and fallback decisions explicitly.
 - [ ] Compare proposals with actual household load for several days.
 
 ### Phase 3: Tesla control
@@ -207,7 +239,7 @@ conservatively.
 
 ### Phase 5: Space-heating control
 
-- [ ] Confirm the representative room sensor.
+- [ ] Optionally confirm a representative heated-room sensor for comfort limits.
 - [ ] Establish an unoptimized comfort and energy baseline.
 - [ ] Test small manual Comfort/Eco shifts.
 - [ ] Enable shadow recommendations, then guarded control.
@@ -224,13 +256,17 @@ conservatively.
 - Restore documented baseline setpoints and modes when optimization ends or is
   disabled.
 - Start in shadow mode and enable one controllable load at a time.
+- Tesla cloud commands provide supplementary load coordination, not reliable
+  fuse protection during network/HA outages. Before active control, establish
+  conservative electrical limits or local charger load balancing.
 
 ## Open decisions
 
-- Which room contains `sensor.h5102_bfe2_temperature`, and is it suitable as
-  the representative heat-pump-heated room sensor?
+- Which room contains `sensor.h5102_bfe2_temperature`, and can it serve as an
+  optional comfort guard? This is not a prerequisite for shadow suggestions.
 - Should the daily Tesla target differ from the vehicle's configured limit?
-- What power and current are available from the present charger?
+- Present charger: single-phase at 9 A, approximately 2 kW; retain this ceiling.
+  What measured SOC gain rate should the charging-time model use?
+- Which supported always-on runtime should host the shadow scheduler?
 - What ordinary-day hot-water fallback should apply after observing usage?
 - How long should manual overrides remain active?
-

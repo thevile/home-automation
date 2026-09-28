@@ -13,3 +13,7 @@
 /home-assistant/home-assistant_v2.db*
 /home-assistant/*.log*
 /home-assistant/backups/
+
+# Python/runtime artifacts
+__pycache__/
+*.pyc
