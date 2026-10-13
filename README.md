@@ -83,9 +83,11 @@ The staged plan for coordinating Nord Pool pricing, heat-pump heating,
 domestic hot water, and Tesla charging is in
 [ENERGY_OPTIMIZATION_PLAN.md](ENERGY_OPTIMIZATION_PLAN.md).
 
-The read-only shadow scheduler now runs as a local HA app and publishes
-`sensor.energy_shadow_raw`. Its separate **Energy shadow** dashboard shows
-recommendations, calibration status, deadlines, and source limitations. The
-[implementation plan](SHADOW_SCHEDULER_PLAN.md) describes its assumptions and
-observation gate. The app source is under `scripts/energy_scheduler/`, with
-non-secret settings in `home-assistant/energy_scheduler/settings.json`.
+Space heating uses a price-spike guard in
+`home-assistant/packages/heating_price_optimizer.yaml`: in Eco mode it lowers
+the Eco setpoint during the day's most expensive 3-hour block, with optional
+preheating. `sensor.heating_eco_plan` always shows what it would do, so it can
+be followed as a dry run before **Heating price optimizer** is switched on.
+Switching the heat pump to Comfort overrides it. The **Heating optimizer**
+dashboard is installed with
+`node scripts/ha-install-dashboard.mjs heating-optimizer "Heating optimizer" mdi:radiator home-assistant/dashboards/heating_price_optimizer.json`.

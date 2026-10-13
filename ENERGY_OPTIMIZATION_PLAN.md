@@ -22,10 +22,13 @@ electricity tax, and time-dependent distribution tariff.
 - [x] Establish SSH deployment access to `homeassistant.local`.
 - [x] Add the official Tesla Fleet integration and inventory its entities.
 - [x] Deploy a read-only shared shadow scheduler and HA recommendation view.
-- [ ] Complete seven-day shadow observation and review.
-- [ ] Enable Tesla charging control.
-- [ ] Enable domestic-hot-water control.
-- [ ] Enable conservative space-heating control.
+- [x] Measure savings potential from recorded prices and consumption
+      (October 2026, see "Savings analysis" below).
+- [x] Retire the shadow scheduler (2026-10-14): its complexity was out of
+      proportion to the savings available.
+- [x] Deploy the heating price optimizer with a dry-run plan sensor.
+- [ ] Follow the dry-run plan into the heating season, then switch it on.
+- Tesla charging and domestic hot water stay on their static night schedules.
 
 ## Confirmed constraints
 
@@ -215,13 +218,20 @@ conservatively.
       entity's nominal 0 A minimum is not proof of the charger's lowest stable
       charging current.
 
-### Phase 2: Shadow scheduler
+### Phase 2: Savings analysis (shadow scheduler retired)
 
-- [x] Write the [shadow scheduler implementation plan](SHADOW_SCHEDULER_PLAN.md).
-- [x] Calculate proposed allocations without issuing commands.
-- [x] Show selected intervals, reasons, deadlines, expected energy, and cost.
-- [x] Report incomplete forecasts and fallback decisions explicitly.
-- [ ] Compare proposals with actual household load for several days.
+A Python shadow scheduler ran as an HA app from 2026-09-23 to 2026-10-14. Its
+calibration did not converge (the hot-water energy counter updates only hourly,
+and Tesla load was double-counted in the capacity envelope), and an analysis of
+recorded data showed the savings did not justify it:
+
+- Tesla: the existing 23:00–06:00 car schedule cost 10.7 c/kWh against 10.2
+  c/kWh for perfect within-night optimization, about EUR 20 per year.
+- Hot water: already heats at night; at most about EUR 10–15 per year.
+- Space heating: price-blind today; moving 3–4 expensive hours per day is worth
+  roughly EUR 40–70 per year, concentrated on cold days with price spikes.
+
+Only the space-heating price-spike guard was implemented.
 
 ### Phase 3: Tesla control
 
@@ -241,8 +251,9 @@ conservatively.
 
 - [ ] Optionally confirm a representative heated-room sensor for comfort limits.
 - [ ] Establish an unoptimized comfort and energy baseline.
-- [ ] Test small manual Comfort/Eco shifts.
-- [ ] Enable shadow recommendations, then guarded control.
+- [x] Test small manual Comfort/Eco shifts.
+- [x] Deploy the Eco-setpoint price optimizer with a dry-run plan sensor.
+- [ ] Enable guarded control after following the dry run.
 - [ ] Tune using comfort, outside temperature, COP, and compressor starts.
 
 ## Safety and fallback rules
@@ -255,7 +266,7 @@ conservatively.
 - HA startup does not issue changes until all source entities are available.
 - Restore documented baseline setpoints and modes when optimization ends or is
   disabled.
-- Start in shadow mode and enable one controllable load at a time.
+- Start as a dry run and enable one controllable load at a time.
 - Tesla cloud commands provide supplementary load coordination, not reliable
   fuse protection during network/HA outages. Before active control, establish
   conservative electrical limits or local charger load balancing.
@@ -263,10 +274,9 @@ conservatively.
 ## Open decisions
 
 - Which room contains `sensor.h5102_bfe2_temperature`, and can it serve as an
-  optional comfort guard? This is not a prerequisite for shadow suggestions.
+  optional comfort guard for the heating price optimizer?
 - Should the daily Tesla target differ from the vehicle's configured limit?
 - Present charger: single-phase at 9 A, approximately 2 kW; retain this ceiling.
   What measured SOC gain rate should the charging-time model use?
-- Which supported always-on runtime should host the shadow scheduler?
 - What ordinary-day hot-water fallback should apply after observing usage?
 - How long should manual overrides remain active?
