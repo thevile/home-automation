@@ -1,0 +1,33 @@
+{
+  "title": "Heating optimizer",
+  "views": [{
+    "title": "Heating optimizer",
+    "path": "heating",
+    "cards": [
+      {"type": "markdown", "title": "Today's plan", "content": "{% set p = 'sensor.heating_eco_plan' %}\n**{{ state_attr(p, 'reason') or 'No plan yet' }}**\n\n{% if state_attr(p, 'block_start') %}| | |\n|---|---|\n| Expensive block | {{ as_timestamp(state_attr(p, 'block_start')) | timestamp_custom('%H:%M') }}–{{ as_timestamp(state_attr(p, 'block_end')) | timestamp_custom('%H:%M') }} |\n| Block price | {{ (state_attr(p, 'block_mean_price') * 100) | round(1) }} c/kWh |\n| Day median | {{ (state_attr(p, 'median_price') * 100) | round(1) }} c/kWh |\n| Preheat from | {{ as_timestamp(state_attr(p, 'preheat_start')) | timestamp_custom('%H:%M') if state_attr(p, 'preheat_start') else 'no preheat' }} |\n| Plan now | {{ states(p) }} °C |\n| Applied target | {{ states('sensor.heating_eco_target') }} °C ({{ state_attr('sensor.heating_eco_target', 'reason') }}) |\n{% endif %}"},
+      {"type": "entities", "title": "Controls", "entities": [
+        "input_boolean.heating_price_optimizer",
+        "select.stiebel_eltron_wpf_10_heating_operating_mode_setting",
+        "number.stiebel_eltron_wpf_10_heating_eco_setpoint",
+        "sensor.stiebel_eltron_wpf_10_heating_write_status",
+        "automation.heating_price_optimizer_apply_eco_target"
+      ]},
+      {"type": "history-graph", "title": "Last 48 hours", "hours_to_show": 48, "entities": [
+        {"entity": "sensor.heating_eco_plan", "name": "Plan (dry run)"},
+        {"entity": "sensor.heating_eco_target", "name": "Applied target"},
+        {"entity": "number.stiebel_eltron_wpf_10_heating_eco_setpoint", "name": "Heat pump Eco setpoint"},
+        {"entity": "sensor.h5102_bfe2_temperature", "name": "Room"},
+        {"entity": "sensor.nordpool_kwh_fi_eur_3_10_0255", "name": "Price"}
+      ]},
+      {"type": "statistics-graph", "title": "Plan, last 14 days (hourly minimum)", "days_to_show": 14, "period": "hour", "chart_type": "line", "stat_types": ["min"], "entities": [
+        {"entity": "sensor.heating_eco_plan", "name": "Plan (dry run)"}
+      ]},
+      {"type": "entities", "title": "Settings (reset to YAML values on restart)", "entities": [
+        "input_number.heating_eco_baseline",
+        "input_number.heating_price_reduction",
+        "input_number.heating_price_preheat",
+        "input_number.heating_price_min_premium"
+      ]}
+    ]
+  }]
+}
