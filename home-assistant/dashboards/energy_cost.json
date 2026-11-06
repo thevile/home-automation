@@ -1,0 +1,35 @@
+{
+  "title": "Energy cost",
+  "views": [{
+    "title": "Energy cost",
+    "path": "cost",
+    "cards": [
+      {"type": "glance", "title": "This month", "columns": 5, "entities": [
+        {"entity": "sensor.electricity_realized_price_this_month", "name": "Realized"},
+        {"entity": "sensor.electricity_average_price_this_month", "name": "Spot average"},
+        {"entity": "sensor.electricity_timing_saving_this_month", "name": "Timing saving"},
+        {"entity": "sensor.grid_import_month", "name": "Energy"},
+        {"entity": "sensor.grid_cost_month", "name": "Cost"}
+      ]},
+      {"type": "glance", "title": "This year", "columns": 5, "entities": [
+        {"entity": "sensor.electricity_realized_price_this_year", "name": "Realized"},
+        {"entity": "sensor.electricity_average_price_this_year", "name": "Spot average"},
+        {"entity": "sensor.electricity_timing_saving_this_year", "name": "Timing saving"},
+        {"entity": "sensor.grid_import_year", "name": "Energy"},
+        {"entity": "sensor.grid_cost_year", "name": "Cost"}
+      ]},
+      {"type": "statistics-graph", "title": "Monthly cost", "days_to_show": 365, "period": "month", "chart_type": "bar", "stat_types": ["change"], "entities": [
+        {"entity": "sensor.cumulative_active_import_cost", "name": "Cost"}
+      ]},
+      {"type": "statistics-graph", "title": "Monthly energy", "days_to_show": 365, "period": "month", "chart_type": "bar", "stat_types": ["change"], "entities": [
+        {"entity": "sensor.cumulative_active_import", "name": "Grid import"}
+      ]},
+      {"type": "history-graph", "title": "Price, last 48 hours (15 min)", "hours_to_show": 48, "entities": [
+        {"entity": "sensor.nordpool_kwh_fi_eur_3_10_0255", "name": "All-in price"}
+      ]},
+      {"type": "statistics-graph", "title": "Hourly price, last 30 days", "days_to_show": 30, "period": "hour", "chart_type": "line", "stat_types": ["mean", "min", "max"], "entities": [
+        {"entity": "sensor.electricity_price_all_in", "name": "All-in price"}
+      ]}
+    ]
+  }]
+}
