@@ -102,7 +102,7 @@ template:
           planned: >
             {% set t = now() %}
             {% if qualifies and as_datetime(plan.block_start) <= t < as_datetime(plan.block_end) %}
-              {{ [baseline - states('input_number.heating_price_reduction') | float(0), 16] | max | round(1) }}
+              {{ (baseline - states('input_number.heating_price_reduction') | float(0)) | round(1) }}
             {% elif qualifies and plan.preheat_start and plan.preheat_mean <= plan.median
                     and as_datetime(plan.preheat_start) <= t < as_datetime(plan.block_start) %}
               {{ (baseline + states('input_number.heating_price_preheat') | float(0)) | round(1) }}
